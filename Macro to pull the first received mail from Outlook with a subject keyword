@@ -3,7 +3,9 @@ Open the Outlook app and searches for that keyword in the subject.
 It goes from Older mails to Newer mails. Finds the Oldest mail with the word in the subject line.
 Copies the Mail Received Date and the mail body in the excel file in columns B & C starting from B2 & C2
 
------------------------------------------------------------------------
+Copy the below code in the Excel VBA Editor
+_______________________________________________________________________________________________________________
+
 Sub FirstResponseDate_Mails()
 
     Dim olApp As Object, olNs As Object, olFolder As Object
