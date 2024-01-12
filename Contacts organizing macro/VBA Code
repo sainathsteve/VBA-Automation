@@ -1,0 +1,297 @@
+This macro helps in sorting and organzing vendor contacts extracted from the internal.
+The output of this macro can be used directly while outreaching vendors.
+Eliminates 7 critical & repititive steps and reduces the contacts organizing time from around 7mins to 5secs.
+
+To use this macro Paste the below code in the Excel VBA editor and run the macro.
+_______________________________________________________________________________________
+
+Sub CopyFilteredData()
+
+    ' Selecting the first row
+    Sheets("Sheet1").Rows(1).Select
+
+    ' Apply filter to Column C
+    Sheets("Sheet1").Range("C1").AutoFilter Field:=3, Criteria1:=Array("Primary Account Rep", "Catalog", "Direct Buying", "Sales"), Operator:=xlFilterValues
+
+    ' Define a range with the used area of the sheet
+    Dim rng As Range
+    Set rng = Sheets("Sheet1").UsedRange
+
+    ' Copy filtered data
+    rng.SpecialCells(xlCellTypeVisible).Copy
+
+    ' Add a new sheet named "Working"
+    Sheets.Add(After:=Sheets(Sheets.Count)).Name = "Working"
+
+    ' Paste copied data to cell A1 in "Working" sheet
+    Sheets("Working").Range("A1").PasteSpecial Paste:=xlPasteAll
+
+    ' Delete column B and F in "Working" sheet
+    Sheets("Working").Columns("F").Delete Shift:=xlToLeft
+    Sheets("Working").Columns("B").Delete Shift:=xlToLeft
+
+End Sub
+
+
+Sub Update_Excel()
+
+    Dim ws As Worksheet, ws2 As Worksheet
+    Dim lRow As Long, lRow2 As Long
+    Dim rng As Range, cell As Range
+    Dim arrData As Variant
+
+    'Get reference to the worksheets
+    Set ws = ThisWorkbook.Sheets("Working")
+    Set ws2 = ThisWorkbook.Sheets.Add(After:=ws)
+    ws2.Name = "Working2"
+
+    'Replace "Primary Account Rep" with "aPrimary Account Rep"
+    With ws
+        .Columns("B").Replace What:="Primary Account Rep", Replacement:="aPrimary Account Rep", LookAt:=xlPart
+        .Columns("B").Sort Key1:=.Range("B1"), Order1:=xlAscending, Header:=xlGuess
+
+        'Write "Combi" in E1 cell
+        .Range("E1").Value = "Combi"
+
+        'Fill down formula in column E, till the bottom row of column A
+        lRow = .Cells(.Rows.Count, "A").End(xlUp).Row
+        .Range("E2:E" & lRow).Formula = "=CONCAT(A2, ""/"", C2)"
+
+        'Copy the formula results and paste them as values in the new sheet "Working2"
+        Set rng = .Range("E1:E" & lRow)
+        rng.Copy
+        ws2.Range("A1").PasteSpecial Paste:=xlPasteValues
+
+        'Remove duplicates from column A
+        ws2.Columns("A").RemoveDuplicates Columns:=Array(1), Header:=xlYes
+
+        'Split column A using "/" as the delimiter
+        ws2.Columns("A").TextToColumns Destination:=Range("A1"), DataType:=xlDelimited, TextQualifier:=xlDoubleQuote, _
+        ConsecutiveDelimiter:=False, Tab:=False, Semicolon:=False, Comma:=False, Space:=False, Other:=True, OtherChar:="/"
+
+        'Delete the first row
+        ws2.Rows(1).Delete
+    End With
+
+End Sub
+
+
+Sub TransposeUniqueValues()
+
+    Dim rng As Range
+    Dim uniqueValues As Collection
+    Dim cell As Range
+    Dim outputRow As Range
+    Dim val As Variant
+    Dim outputColumn As Integer
+
+    ' Define the range to scan for unique values
+    Set rng = ThisWorkbook.Sheets("Working2").Range("A:A")
+
+    ' Create a new collection to store unique values
+    Set uniqueValues = New Collection
+
+    ' Attempt to add each cell's value to the uniqueValues collection
+    ' If the value is already in the collection, this will throw an error, so ignore errors
+    On Error Resume Next
+    For Each cell In rng
+        uniqueValues.Add cell.Value, CStr(cell.Value)
+    Next cell
+    On Error GoTo 0 ' Resume normal error handling
+
+    ' Define the row where the transposed values will be written
+    Set outputRow = ThisWorkbook.Sheets("Working2").Rows(1)
+
+    ' Write each unique value to a cell in the output row
+    outputColumn = 5 ' Start at column E (column number 5)
+    For Each val In uniqueValues
+        outputRow.Cells(outputColumn).Value = val
+        outputColumn = outputColumn + 1
+    Next val
+
+End Sub
+
+Sub AutoFill_Formula()
+    
+    ' Declare variables
+    Dim ws As Worksheet
+    Dim lastColumn As Long
+    
+    ' Set the worksheet
+    Set ws = ThisWorkbook.Worksheets("Working2")
+    
+    ' Obtain the last column in the first row with data
+    lastColumn = ws.Cells(1, ws.Columns.Count).End(xlToLeft).Column
+    
+    ' Write formula in E2 and copy it to the right-most cell based on data availability in Row 1
+    With ws.Range("E2")
+        .Formula2 = "=FILTER($B:$B, $A:$A = E1)"
+        .AutoFill Destination:=ws.Range(.Cells, ws.Cells(2, lastColumn)), Type:=xlFillDefault
+    End With
+
+End Sub
+
+Sub ApplyTEXTJOINAndFormat()
+
+    ' Define the worksheet
+    Dim ws As Worksheet
+    Set ws = ThisWorkbook.Sheets("Working2")
+    
+    ' Define the last column with data in Row 1
+    Dim lastColumn As Long
+    lastColumn = ws.Cells(1, Columns.Count).End(xlToLeft).Column
+
+    ' Loop through all the columns starting from column E (5th column) to the last column
+    For i = 5 To lastColumn
+        ' Apply the formula to cell
+        ws.Cells(25, i).Formula = "=TEXTJOIN(""; "", TRUE, " & ws.Cells(3, i).Address & ":" & ws.Cells(24, i).Address & ")"
+        ' Change the format of the cell to values
+        ws.Cells(25, i).Value = ws.Cells(25, i).Value
+    Next i
+
+End Sub
+
+Sub CopyPasteToValues()
+
+    ' Go to cell E2
+    Range("E2").Select
+    
+    ' Extend selection horizontally to the right-most cell based on the data availability in Row 1.
+    Range("E2", Range("E2").End(xlToRight)).Select
+    
+    ' Copy the selected cells
+    Selection.Copy
+    
+    ' Go to cell E26
+    Range("E26").Select
+    
+    ' Paste and change the format of those data as VALUES
+    Selection.PasteSpecial Paste:=xlPasteValues
+
+    ' Clearing clipboard so that you don't get the annoying "There's a large amount of data on the clipboard. Do you want to keep this data on the clipboard?" prompt.
+    Application.CutCopyMode = False
+End Sub
+
+Sub MoveAndTransposeData()
+
+    'Create a new worksheet named "Final"
+    Worksheets.Add(After:=Worksheets(Worksheets.Count)).Name = "Final"
+
+    'Assign specific values to cells A1, B1, and C1 in the "Final" worksheet
+    With Worksheets("Final")
+        .Range("A1").Value = "VendorCode"
+        .Range("B1").Value = "PrimaryEmail"
+        .Range("D1").Value = "CC"
+    End With
+
+    'Transpose from Working2 cell E25 to Final Sheet C2
+    Dim lr1 As Long
+    lr1 = Worksheets("Working2").Cells(1, "E").End(xlToRight).Column
+    Worksheets("Working2").Range(Worksheets("Working2").Cells(25, "E"), Worksheets("Working2").Cells(25, lr1)).Copy
+    Worksheets("Final").Range("D2").PasteSpecial Paste:=xlPasteAll, Operation:=xlNone, SkipBlanks:=False, Transpose:=True
+
+    'Transpose from Working2 cell E26 to Final Sheet B2
+    Dim lr2 As Long
+    lr2 = Worksheets("Working2").Cells(1, "E").End(xlToRight).Column
+    Worksheets("Working2").Range(Worksheets("Working2").Cells(26, "E"), Worksheets("Working2").Cells(26, lr2)).Copy
+    Worksheets("Final").Range("B2").PasteSpecial Paste:=xlPasteAll, Operation:=xlNone, SkipBlanks:=False, Transpose:=True
+
+    'Transpose from Working2 cell E1 to Final Sheet A2
+    Dim lr3 As Long
+    lr3 = Worksheets("Working2").Cells(1, "E").End(xlToRight).Column
+    Worksheets("Working2").Range(Worksheets("Working2").Cells(1, "E"), Worksheets("Working2").Cells(1, lr3)).Copy
+    Worksheets("Final").Range("A2").PasteSpecial Paste:=xlPasteAll, Operation:=xlNone, SkipBlanks:=False, Transpose:=True
+
+End Sub
+
+Sub FillContactName()
+    
+    ' Variables declaration
+    Dim LastRow As Long
+
+    ' Defining the LastRow of column A in Final worksheet
+    LastRow = ThisWorkbook.Sheets("Final").Range("A" & Rows.Count).End(xlUp).Row
+
+    ' Navigate to Worksheet "Final"
+    Sheets("Final").Activate
+
+    ' Insert "ContactName" into cell C1
+    Range("C1").Value = "ContactName"
+
+    ' Fill the VLOOKUP formula for the range of cells
+    Range("C2:C" & LastRow).Formula = "=VLOOKUP(B2,Sheet1!D:E,2,0)"
+    
+    ' Copy and Paste as Values Format
+    Range("C2:C" & LastRow).Copy
+    Range("C2:C" & LastRow).PasteSpecial xlPasteValues
+
+    Application.CutCopyMode = False ' Clearing Clipboard
+
+End Sub
+
+Sub FormatAndAutoFitColumns()
+    ' Get the "Final" worksheet
+    Dim ws As Worksheet
+    Set ws = ThisWorkbook.Sheets("Final")
+    
+    ' Change the format of Row 1 to bold
+    ws.Rows(1).Font.Bold = True
+    
+    ' Autofit columns A, B and C based on its cell values
+    ws.Columns("A:C").AutoFit
+End Sub
+
+Sub ToggleFilter()
+
+' Activate the worksheet "Sheet1"
+Worksheets("Sheet1").Activate
+
+' Check if filtering is currently applied in Row 1 in the "Sheet1" and turn it off
+If Worksheets("Sheet1").Rows(1).AutoFilter Then
+    Worksheets("Sheet1").Rows(1).AutoFilter
+End If
+
+' Go to the "Final" worksheet
+Worksheets("Final").Activate
+
+End Sub
+
+
+Sub DeleteSheetsAndNotify()
+
+    ' Turn off Excel's warning messages
+    Application.DisplayAlerts = False
+    
+    ' Delete the "Working" sheet
+    Sheets("Working").Delete
+    
+    ' Delete the "Working2" sheet
+    Sheets("Working2").Delete
+    
+    ' Turn Excel's warning messages back on
+    Application.DisplayAlerts = True
+
+    ' Switch to the "Final" sheet
+    Sheets("Final").Activate
+
+    ' Display a message box with the message "Sorting Completed!!"
+    MsgBox "Sorting Completed!!", vbInformation
+
+End Sub
+
+
+Sub SortingMacro()
+
+Call CopyFilteredData
+Call Update_Excel
+Call TransposeUniqueValues
+Call AutoFill_Formula
+Call ApplyTEXTJOINAndFormat
+Call CopyPasteToValues
+Call MoveAndTransposeData
+Call FillContactName
+Call FormatAndAutoFitColumns
+Call ToggleFilter
+Call DeleteSheetsAndNotify
+
+End Sub
